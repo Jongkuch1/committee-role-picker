@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Role Picker — Admin</title>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --background: #f3f4f6;
+            --card-bg: #ffffff;
+            --text: #1f2937;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--background);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            width: 100%;
+            max-width: 420px;
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            font-size: 22px;
+        }
+
+        p {
+            color: #6b7280;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        input[type="password"] {
+            padding: 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 16px;
+            width: 100%;
+            outline: none;
+            margin-bottom: 15px;
+        }
+
+        button {
+            background-color: #dc2626;
+            color: white;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .error-message {
+            color: #dc2626;
+            background: #fee2e2;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            display: none;
+            font-weight: 500;
+        }
+
+        .status-message {
+            color: #16a34a;
+            background: #f0fdf4;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            display: none;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Admin: Reset Role Picker</h1>
+    <p>This wipes every opened box and every participant's selection, for everyone, on every device.</p>
+
+    <div id="error-message" class="error-message"></div>
+    <div id="status-message" class="status-message"></div>
+
+    <input type="password" id="password-input" placeholder="Enter admin password">
+    <button type="button" onclick="confirmReset()">Reset Game For Everyone</button>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyBJRYEsgdtYs3eV_2ZnJ4dLU8yFbmOAHDg",
+        authDomain: "committee-role-picker.firebaseapp.com",
+        databaseURL: "https://committee-role-picker-default-rtdb.firebaseio.com",
+        projectId: "committee-role-picker",
+        storageBucket: "committee-role-picker.firebasestorage.app",
+        messagingSenderId: "599973518116",
+        appId: "1:599973518116:web:1ba866e77353c500a871b1"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const rolesPool = [
+        "Secretary General (Male)",
+        "Organizing Secretary (Female)",
+        "Member (Male)",
+        "Member (Female)",
+        "Empty",
+        "Empty",
+        "Empty",
+        "Empty",
+        "Empty"
+    ];
+
+    const ADMIN_PASSWORD = "Jongkuch123#";
+
+    function shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    function confirmReset() {
+        const input = document.getElementById('password-input').value;
+        const errorDiv = document.getElementById('error-message');
+        const statusDiv = document.getElementById('status-message');
+        errorDiv.style.display = 'none';
+        statusDiv.style.display = 'none';
+
+        if (input !== ADMIN_PASSWORD) {
+            errorDiv.textContent = "Incorrect password.";
+            errorDiv.style.display = 'block';
+            return;
+        }
+
+        if (!confirm("This resets every box and every participant's selection for everyone, on every device. Continue?")) {
+            return;
+        }
+
+        db.ref('boxState').remove()
+            .then(() => db.ref('historyLog').remove())
+            .then(() => db.ref('boxState').transaction(current => {
+                if (current === null) {
+                    const shuffled = shuffle([...rolesPool]);
+                    return shuffled.map(role => ({ role, opened: false }));
+                }
+                return current;
+            }))
+            .then(() => {
+                document.getElementById('password-input').value = '';
+                statusDiv.textContent = "Game reset for everyone. All boxes are closed again.";
+                statusDiv.style.display = 'block';
+            });
+    }
+</script>
+
+</body>
+</html>

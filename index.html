@@ -208,17 +208,6 @@
         <p style="color: #6b7280; font-size: 14px;">Your response has been locked. You cannot pick another box.</p>
         <button type="button" onclick="signOut()" style="background: #6b7280; margin-top: 15px;">Sign out (let someone else sign in)</button>
     </div>
-
-    <div id="admin-section" style="margin-top: 20px; border-top: 1px solid #e5e7eb; padding-top: 15px;">
-        <button type="button" id="admin-toggle-btn" onclick="toggleAdminPanel()" style="background: #dc2626;">Reset Game (admin only)</button>
-
-        <div id="admin-panel" style="display: none; margin-top: 12px; flex-direction: column; gap: 10px;">
-            <input type="password" id="admin-password-input" placeholder="Enter admin password">
-            <div id="admin-error" class="error-message"></div>
-            <button type="button" onclick="confirmAdminReset()" style="background: #dc2626;">Confirm Reset</button>
-            <button type="button" onclick="toggleAdminPanel()" style="background: #6b7280;">Cancel</button>
-        </div>
-    </div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -372,44 +361,6 @@
             db.ref('historyLog/' + currentUserKey).set({ name: currentUser, role: chosenRole });
 
             showResult(chosenRole);
-        });
-    }
-
-    const ADMIN_PASSWORD = "Jongkuch123#";
-
-    function toggleAdminPanel() {
-        const panel = document.getElementById('admin-panel');
-        const isOpen = panel.style.display === 'flex';
-        panel.style.display = isOpen ? 'none' : 'flex';
-        document.getElementById('admin-error').style.display = 'none';
-        document.getElementById('admin-password-input').value = '';
-    }
-
-    function confirmAdminReset() {
-        const input = document.getElementById('admin-password-input').value;
-        const errorDiv = document.getElementById('admin-error');
-
-        if (input !== ADMIN_PASSWORD) {
-            errorDiv.textContent = "Incorrect password.";
-            errorDiv.style.display = "block";
-            return;
-        }
-
-        if (!confirm("This resets every box and every participant's selection for everyone. Continue?")) {
-            return;
-        }
-
-        db.ref('boxState').remove();
-        db.ref('historyLog').remove();
-        db.ref('boxState').transaction(current => {
-            if (current === null) {
-                const shuffled = shuffle([...rolesPool]);
-                return shuffled.map(role => ({ role, opened: false }));
-            }
-            return current;
-        }).then(() => {
-            alert("Game reset.");
-            window.location.reload();
         });
     }
 
