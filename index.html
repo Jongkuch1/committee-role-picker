@@ -188,6 +188,7 @@
         <div id="login-error" class="error-message"></div>
         <input type="text" id="username-input" placeholder="Enter your full name" required>
         <button onclick="handleSignIn()">Sign In</button>
+        <button type="button" onclick="resetGame()" style="background: #dc2626;">Reset Game (admin only)</button>
     </div>
 
     <!-- 2. MAIN GAME SCREEN -->
@@ -338,6 +339,16 @@
 
         // 3. Move UI to confirmation view
         showResult(chosenRole);
+    }
+
+    function resetGame() {
+        if (!confirm("This clears every selection made on THIS browser only (not other participants' devices). Continue?")) {
+            return;
+        }
+        localStorage.removeItem('boxState');
+        localStorage.removeItem('historyLog');
+        localStorage.removeItem('activeUser');
+        window.location.reload();
     }
 
     function showResult(role) {
