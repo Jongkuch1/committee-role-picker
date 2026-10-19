@@ -188,7 +188,6 @@
         <div id="login-error" class="error-message"></div>
         <input type="text" id="username-input" placeholder="Enter your full name" required>
         <button onclick="handleSignIn()">Sign In</button>
-        <button type="button" onclick="resetGame()" style="background: #dc2626;">Reset Game (admin only)</button>
     </div>
 
     <!-- 2. MAIN GAME SCREEN -->
@@ -211,7 +210,21 @@
     </div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyBJRYEsgdtYs3eV_2ZnJ4dLU8yFbmOAHDg",
+        authDomain: "committee-role-picker.firebaseapp.com",
+        databaseURL: "https://committee-role-picker-default-rtdb.firebaseio.com",
+        projectId: "committee-role-picker",
+        storageBucket: "committee-role-picker.firebasestorage.app",
+        messagingSenderId: "599973518116",
+        appId: "1:599973518116:web:1ba866e77353c500a871b1"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
     // Pre-loaded roles, plus 5 empty boxes
     const rolesPool = [
         "Secretary General (Male)",
@@ -226,6 +239,7 @@
     ];
 
     let currentUser = null;
+    let currentUserKey = null;
 
     // Helper function to shuffle array items uniformly
     function shuffle(array) {
@@ -236,23 +250,28 @@
         return array;
     }
 
-    // boxState holds, per index, the role and whether it has been opened.
-    // Note: this is simulated with localStorage, so "everyone" only means
-    // everyone sharing this same browser/device — it does not sync across devices.
-    if (!localStorage.getItem('boxState')) {
-        const shuffled = shuffle([...rolesPool]);
-        const initialState = shuffled.map(role => ({ role, opened: false }));
-        localStorage.setItem('boxState', JSON.stringify(initialState));
+    // Firebase keys can't contain ".", "#", "$", "[", "]", "/" — encode the name to be safe.
+    function sanitizeKey(name) {
+        return encodeURIComponent(name.trim().toLowerCase());
     }
-    if (!localStorage.getItem('historyLog')) {
-        localStorage.setItem('historyLog', JSON.stringify({}));
-    }
+
+    // boxState lives in Firebase Realtime Database, so it is shared live across every device.
+    // Transaction ensures only one client ever performs the initial shuffle, even if several
+    // people load the page for the first time at the same moment.
+    db.ref('boxState').transaction(current => {
+        if (current === null) {
+            const shuffled = shuffle([...rolesPool]);
+            return shuffled.map(role => ({ role, opened: false }));
+        }
+        return current;
+    });
 
     // Check if the user has already picked previously upon opening page
     window.onload = function() {
         const activeUser = localStorage.getItem('activeUser');
         if (activeUser) {
             currentUser = activeUser;
+            currentUserKey = sanitizeKey(activeUser);
             checkUserGameStatus();
         }
     };
@@ -268,6 +287,7 @@
         }
 
         currentUser = input;
+        currentUserKey = sanitizeKey(input);
         localStorage.setItem('activeUser', currentUser);
         errorDiv.style.display = "none";
 
@@ -276,27 +296,31 @@
 
     function checkUserGameStatus() {
         document.getElementById('login-screen').style.display = 'none';
-        const historyLog = JSON.parse(localStorage.getItem('historyLog'));
 
         // Strict Enforcement: If user already has a logged selection, force the result screen
-        if (historyLog[currentUser]) {
-            showResult(historyLog[currentUser]);
-        } else {
-            showGame();
-        }
+        db.ref('historyLog/' + currentUserKey).once('value').then(snapshot => {
+            const entry = snapshot.val();
+            if (entry) {
+                showResult(entry.role);
+            } else {
+                showGame();
+            }
+        });
     }
 
     function showGame() {
         document.getElementById('game-screen').style.display = 'block';
         document.getElementById('user-display').textContent = `Logged in as: ${currentUser}`;
-        renderBoxes();
+
+        // Live listener: boxes update in real time as other participants open them.
+        db.ref('boxState').on('value', snapshot => {
+            renderBoxes(snapshot.val() || []);
+        });
     }
 
-    function renderBoxes() {
+    function renderBoxes(boxState) {
         const grid = document.getElementById('box-grid');
         grid.innerHTML = '';
-
-        const boxState = JSON.parse(localStorage.getItem('boxState'));
 
         boxState.forEach((box, index) => {
             const boxElement = document.createElement('div');
@@ -318,43 +342,31 @@
     }
 
     function selectBox(index) {
-        const historyLog = JSON.parse(localStorage.getItem('historyLog'));
+        // Atomically claim the box so two people clicking at the same instant can't both win it.
+        db.ref('boxState/' + index).transaction(current => {
+            if (current && current.opened === false) {
+                current.opened = true;
+                return current;
+            }
+            return; // abort — someone already opened this box
+        }).then(result => {
+            if (!result.committed) {
+                alert("Someone just opened that box. Pick another one.");
+                return;
+            }
 
-        // Double-check lockout status right at click time
-        if (historyLog[currentUser]) {
-            alert("Security Lock: You have already picked a box!");
-            window.location.reload();
-            return;
-        }
+            const chosenRole = result.snapshot.val().role;
 
-        let boxState = JSON.parse(localStorage.getItem('boxState'));
-        const chosenRole = boxState[index].role;
+            db.ref('boxState').off('value');
+            db.ref('historyLog/' + currentUserKey).set({ name: currentUser, role: chosenRole });
 
-        // 1. Assign item to the active user profile
-        historyLog[currentUser] = chosenRole;
-        localStorage.setItem('historyLog', JSON.stringify(historyLog));
-
-        // 2. Mark the box as opened, but keep it visible/revealed instead of removing it
-        boxState[index].opened = true;
-        localStorage.setItem('boxState', JSON.stringify(boxState));
-
-        // 3. Move UI to confirmation view
-        showResult(chosenRole);
+            showResult(chosenRole);
+        });
     }
 
     function signOut() {
         // Only clears who is currently signed in on this browser.
-        // Opened boxes and everyone's history stay exactly as they are.
-        localStorage.removeItem('activeUser');
-        window.location.reload();
-    }
-
-    function resetGame() {
-        if (!confirm("This clears every selection made on THIS browser only (not other participants' devices). Continue?")) {
-            return;
-        }
-        localStorage.removeItem('boxState');
-        localStorage.removeItem('historyLog');
+        // Opened boxes and everyone's history stay exactly as they are, shared in Firebase.
         localStorage.removeItem('activeUser');
         window.location.reload();
     }
