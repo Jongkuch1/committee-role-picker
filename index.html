@@ -131,6 +131,23 @@
             margin-bottom: 5px;
         }
 
+        .box.opened {
+            background: #9ca3af;
+            cursor: default;
+            font-size: 13px;
+            padding: 6px;
+            text-align: center;
+        }
+
+        .box.opened:hover {
+            transform: none;
+            background: #9ca3af;
+        }
+
+        .box.opened.has-role {
+            background: #16a34a;
+        }
+
         /* Result Screen Styles */
         #result-screen {
             display: none;
@@ -177,7 +194,7 @@
     <div id="game-screen">
         <h1>Select Exactly One Mystery Box</h1>
         <div id="user-display" class="user-badge"></div>
-        <p style="color: #6b7280; font-size: 14px;">Once you click a box, your choice is final and the box will be removed.</p>
+        <p style="color: #6b7280; font-size: 14px;">Once a box is opened, it stays open (visible to everyone) and locked in. Unopened boxes stay closed.</p>
         <div id="box-grid" class="grid"></div>
     </div>
 
@@ -193,12 +210,17 @@
 </div>
 
 <script>
-    // Pre-loaded roles as requested
+    // Pre-loaded roles, plus 5 empty boxes
     const rolesPool = [
         "Secretary General (Male)",
         "Organizing Secretary (Female)",
         "Member (Male)",
-        "Member (Female)"
+        "Member (Female)",
+        "Empty",
+        "Empty",
+        "Empty",
+        "Empty",
+        "Empty"
     ];
 
     let currentUser = null;
@@ -212,10 +234,13 @@
         return array;
     }
 
-    // Initialize or retrieve game configuration
-    // Uses localStorage so state is maintained locally even on page refresh
-    if (!localStorage.getItem('shuffledRoles')) {
-        localStorage.setItem('shuffledRoles', JSON.stringify(shuffle([...rolesPool])));
+    // boxState holds, per index, the role and whether it has been opened.
+    // Note: this is simulated with localStorage, so "everyone" only means
+    // everyone sharing this same browser/device — it does not sync across devices.
+    if (!localStorage.getItem('boxState')) {
+        const shuffled = shuffle([...rolesPool]);
+        const initialState = shuffled.map(role => ({ role, opened: false }));
+        localStorage.setItem('boxState', JSON.stringify(initialState));
     }
     if (!localStorage.getItem('historyLog')) {
         localStorage.setItem('historyLog', JSON.stringify({}));
@@ -269,23 +294,25 @@
         const grid = document.getElementById('box-grid');
         grid.innerHTML = '';
 
-        const currentRoles = JSON.parse(localStorage.getItem('shuffledRoles'));
+        const boxState = JSON.parse(localStorage.getItem('boxState'));
 
-        currentRoles.forEach((role, index) => {
-            // Only render boxes that haven't been picked (indicated by null)
-            if (role !== null) {
-                const boxElement = document.createElement('div');
+        boxState.forEach((box, index) => {
+            const boxElement = document.createElement('div');
+
+            if (box.opened) {
+                // Opened boxes stay visible and revealed to everyone; they can't be picked again.
+                const isEmpty = box.role === "Empty";
+                boxElement.className = `box opened${isEmpty ? '' : ' has-role'}`;
+                boxElement.innerHTML = `<span class="box-icon">${isEmpty ? '📦' : '🏆'}</span>${box.role}`;
+            } else {
+                // Everything not yet opened stays closed/mystery for everyone.
                 boxElement.className = 'box';
                 boxElement.innerHTML = `<span class="box-icon">🎁</span>Box ${index + 1}`;
                 boxElement.onclick = () => selectBox(index);
-                grid.appendChild(boxElement);
             }
-        });
 
-        // Fallback check if all boxes have been exhausted
-        if (grid.children.length === 0) {
-            grid.innerHTML = '<p style="grid-column: 1/-1; color: #dc2626; font-weight: 600;">All mystery boxes have already been claimed!</p>';
-        }
+            grid.appendChild(boxElement);
+        });
     }
 
     function selectBox(index) {
@@ -298,16 +325,16 @@
             return;
         }
 
-        let currentRoles = JSON.parse(localStorage.getItem('shuffledRoles'));
-        const chosenRole = currentRoles[index];
+        let boxState = JSON.parse(localStorage.getItem('boxState'));
+        const chosenRole = boxState[index].role;
 
         // 1. Assign item to the active user profile
         historyLog[currentUser] = chosenRole;
         localStorage.setItem('historyLog', JSON.stringify(historyLog));
 
-        // 2. Automatic Elimination: Remove item completely from the active index array
-        currentRoles[index] = null;
-        localStorage.setItem('shuffledRoles', JSON.stringify(currentRoles));
+        // 2. Mark the box as opened, but keep it visible/revealed instead of removing it
+        boxState[index].opened = true;
+        localStorage.setItem('boxState', JSON.stringify(boxState));
 
         // 3. Move UI to confirmation view
         showResult(chosenRole);
