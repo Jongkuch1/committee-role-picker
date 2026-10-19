@@ -206,7 +206,6 @@
             <div id="revealed-role" class="role-text"></div>
         </div>
         <p style="color: #6b7280; font-size: 14px;">Your response has been locked. You cannot pick another box.</p>
-        <button type="button" onclick="signOut()" style="background: #6b7280; margin-top: 15px;">Sign out (let someone else sign in)</button>
     </div>
 </div>
 
@@ -362,13 +361,6 @@
 
             showResult(chosenRole);
         });
-    }
-
-    function signOut() {
-        // Only clears who is currently signed in on this browser.
-        // Opened boxes and everyone's history stay exactly as they are, shared in Firebase.
-        localStorage.removeItem('activeUser');
-        window.location.reload();
     }
 
     function showResult(role) {
