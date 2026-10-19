@@ -197,7 +197,6 @@
         <div id="user-display" class="user-badge"></div>
         <p style="color: #6b7280; font-size: 14px;">Once a box is opened, it stays open (visible to everyone) and locked in. Unopened boxes stay closed.</p>
         <div id="box-grid" class="grid"></div>
-        <button type="button" onclick="resetGame()" style="background: #dc2626; margin-top: 15px;">Reset Game (admin only)</button>
     </div>
 
     <!-- 3. RESULT SCREEN -->
@@ -208,7 +207,7 @@
             <div id="revealed-role" class="role-text"></div>
         </div>
         <p style="color: #6b7280; font-size: 14px;">Your response has been locked. You cannot pick another box.</p>
-        <button type="button" onclick="resetGame()" style="background: #dc2626; margin-top: 15px;">Reset Game (admin only)</button>
+        <button type="button" onclick="signOut()" style="background: #6b7280; margin-top: 15px;">Sign out (let someone else sign in)</button>
     </div>
 </div>
 
@@ -341,6 +340,13 @@
 
         // 3. Move UI to confirmation view
         showResult(chosenRole);
+    }
+
+    function signOut() {
+        // Only clears who is currently signed in on this browser.
+        // Opened boxes and everyone's history stay exactly as they are.
+        localStorage.removeItem('activeUser');
+        window.location.reload();
     }
 
     function resetGame() {
