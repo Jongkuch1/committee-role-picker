@@ -224,11 +224,12 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // Pre-loaded roles
+    // Pre-loaded roles, plus empty boxes
     const rolesPool = [
-        "Information officer (Male)",
         "Member (Female)",
-        "Member (Male)"
+        "Empty",
+        "Empty",
+        "Empty"
     ];
 
     let currentUser = null;
